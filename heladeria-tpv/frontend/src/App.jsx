@@ -1,0 +1,46 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { SessionProvider } from './context/SessionContext'
+import NavBar from './components/NavBar'
+import IconDefs from './components/IconDefs'
+import CashRegisterPage from './pages/CashRegisterPage'
+import CashBoxHistoryPage from './pages/CashBoxHistoryPage'
+import TablesPage from './pages/TablesPage'
+import TableDetailPage from './pages/TableDetailPage'
+import ReportsPage from './pages/ReportsPage'
+import ProductsPage from './pages/ProductsPage'
+import SettingsPage from './pages/SettingsPage'
+import ShiftReceiptPage from './pages/ShiftReceiptPage'
+import OrderReceiptPage from './pages/OrderReceiptPage'
+import './styles/global.css'
+
+function Layout({ children }) {
+  return (
+    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <NavBar />
+      <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>{children}</main>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <SessionProvider>
+      <IconDefs />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/reportes" replace />} />
+          <Route path="/mesas" element={<Layout><TablesPage /></Layout>} />
+          <Route path="/mesas/:tableId" element={<Layout><TableDetailPage /></Layout>} />
+          <Route path="/turno" element={<Layout><CashRegisterPage /></Layout>} />
+          <Route path="/cuadre-de-caja" element={<Layout><CashBoxHistoryPage /></Layout>} />
+          <Route path="/reportes" element={<Layout><ReportsPage /></Layout>} />
+          <Route path="/productos" element={<Layout><ProductsPage /></Layout>} />
+          <Route path="/configuracion" element={<Layout><SettingsPage /></Layout>} />
+          {/* Ruta independiente, sin NavBar, pensada para abrirse en pestana/ventana aparte */}
+          <Route path="/recibo/:cashRegisterId" element={<ShiftReceiptPage />} />
+          <Route path="/recibo-venta/:orderId" element={<OrderReceiptPage />} />
+        </Routes>
+      </BrowserRouter>
+    </SessionProvider>
+  )
+}

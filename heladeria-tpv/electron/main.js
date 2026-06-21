@@ -1,0 +1,141 @@
+const { app, BrowserWindow, dialog } = require('electron')
+const path = require('path')
+const { spawn } = require('child_process')
+const http = require('http')
+const fs = require('fs')
+
+let backendProcess = null
+let mainWindow = null
+
+const isDev = !app.isPackaged
+const BACKEND_PORT = 8080
+const BACKEND_URL = `http://localhost:${BACKEND_PORT}/api/products`
+
+function getAppDataDir() {
+  // Carpeta persistente del usuario, fuera de la carpeta de instalacion,
+  // para que la base de datos sobreviva actualizaciones y reinstalaciones.
+  const dir = path.join(app.getPath('appData'), 'heladeria-tpv')
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true })
+  }
+  return dir
+}
+
+function getJavaExecutable() {
+  // En produccion se incluye un JRE empaquetado dentro de resources/jre.
+  // En desarrollo se usa el java instalado en el sistema (JAVA_HOME o PATH).
+  if (isDev) {
+    return 'java'
+  }
+  const bundledJava = path.join(
+    process.resourcesPath,
+    'jre',
+    process.platform === 'win32' ? 'bin/java.exe' : 'bin/java'
+  )
+  return fs.existsSync(bundledJava) ? bundledJava : 'java'
+}
+
+function getJarPath() {
+  if (isDev) {
+    return path.join(__dirname, '..', 'backend', 'target', 'heladeria-tpv.jar')
+  }
+  return path.join(process.resourcesPath, 'backend', 'heladeria-tpv.jar')
+}
+
+function startBackend() {
+  return new Promise((resolve, reject) => {
+    const javaExecutable = getJavaExecutable()
+    const jarPath = getJarPath()
+
+    if (!fs.existsSync(jarPath)) {
+      reject(new Error(`No se encontro el archivo del backend en: ${jarPath}`))
+      return
+    }
+
+    backendProcess = spawn(javaExecutable, ['-jar', jarPath], {
+      env: { ...process.env, APP_DATA_DIR: getAppDataDir() },
+    })
+
+    backendProcess.stdout.on('data', (data) => {
+      console.log(`[backend] ${data}`)
+    })
+
+    backendProcess.stderr.on('data', (data) => {
+      console.error(`[backend] ${data}`)
+    })
+
+    backendProcess.on('error', (err) => {
+      reject(err)
+    })
+
+    backendProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(`El backend termino con codigo ${code}`)
+      }
+    })
+
+    waitForBackend(resolve, reject)
+  })
+}
+
+function waitForBackend(resolve, reject, attemptsLeft = 60) {
+  if (attemptsLeft <= 0) {
+    reject(new Error('El backend no respondio a tiempo'))
+    return
+  }
+
+  http
+    .get(BACKEND_URL, () => resolve())
+    .on('error', () => {
+      setTimeout(() => waitForBackend(resolve, reject, attemptsLeft - 1), 500)
+    })
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  mainWindow.setMenuBarVisibility(false)
+
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173')
+  } else {
+    mainWindow.loadFile(path.join(process.resourcesPath, 'frontend', 'index.html'))
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+}
+
+app.whenReady().then(async () => {
+  try {
+    await startBackend()
+    createWindow()
+  } catch (err) {
+    dialog.showErrorBox(
+      'No se pudo iniciar la aplicacion',
+      `Ocurrio un problema arrancando el sistema:\n${err.message}`
+    )
+    app.quit()
+  }
+})
+
+app.on('window-all-closed', () => {
+  if (backendProcess) {
+    backendProcess.kill()
+  }
+  app.quit()
+})
+
+app.on('before-quit', () => {
+  if (backendProcess) {
+    backendProcess.kill()
+  }
+})

@@ -1,0 +1,18 @@
+# Backend
+backend/target/
+backend/*.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Electron
+electron/node_modules/
+electron/dist/
+electron/resources/
+electron/jre/*
+!electron/jre/.gitkeep
+
+# General
+.DS_Store
+*.log
