@@ -20,6 +20,7 @@ export default function TablesPage() {
 
   const containerRef = useRef(null)
   const dragRef = useRef(null)
+  const wasDragRef = useRef(false)
 
   function load() {
     getTables().then((loaded) => {
@@ -87,6 +88,7 @@ export default function TablesPage() {
       if (!d) return
       dragRef.current = null
       if (d.moved) {
+        wasDragRef.current = true
         const table = document.querySelector(`[data-table-id="${d.tableId}"]`)
         if (table) {
           const finalX = parseFloat(table.style.left)
@@ -105,8 +107,10 @@ export default function TablesPage() {
   }, [])
 
   function handleCardClick(e, table) {
-    const d = dragRef.current
-    if (d && d.moved) return
+    if (wasDragRef.current) {
+      wasDragRef.current = false
+      return
+    }
     navigate(`/mesas/${table.id}`)
   }
 
