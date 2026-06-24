@@ -113,7 +113,7 @@ export default function TableDetailPage() {
         items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity, note: i.note || null })),
         ...paymentData,
       })
-      window.open(`/recibo-venta/${order.id}`, '_blank', 'width=420,height=720')
+      window.open(`#/recibo-venta/${order.id}`, '_blank', 'width=420,height=720')
       setCart([])
       setShowPayment(false)
       loadTable()

@@ -109,6 +109,28 @@ function createWindow() {
     mainWindow.loadFile(path.join(process.resourcesPath, 'frontend', 'index.html'))
   }
 
+  mainWindow.webContents.setWindowOpenHandler(({ url, features }) => {
+    const width = parseInt((features.match(/width=(\d+)/) || [])[1]) || 420
+    const height = parseInt((features.match(/height=(\d+)/) || [])[1]) || 720
+    const parsed = new URL(url, 'http://localhost')
+    const hash = parsed.hash || parsed.pathname
+    const child = new BrowserWindow({
+      width,
+      height,
+      parent: mainWindow,
+      webPreferences: { contextIsolation: true, nodeIntegration: false },
+    })
+    child.setMenuBarVisibility(false)
+    if (isDev) {
+      child.loadURL(`http://localhost:5173/${hash}`)
+    } else {
+      child.loadFile(path.join(process.resourcesPath, 'frontend', 'index.html'), {
+        hash: hash.replace(/^#/, ''),
+      })
+    }
+    return { action: 'deny' }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -127,15 +149,24 @@ app.whenReady().then(async () => {
   }
 })
 
-app.on('window-all-closed', () => {
-  if (backendProcess) {
-    backendProcess.kill()
+function killBackend() {
+  if (!backendProcess) return
+  const pid = backendProcess.pid
+  backendProcess = null
+  try {
+    process.kill(pid)
+  } catch (_) {}
+  // Ensure the whole process tree is gone on Windows
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
   }
+}
+
+app.on('window-all-closed', () => {
+  killBackend()
   app.quit()
 })
 
 app.on('before-quit', () => {
-  if (backendProcess) {
-    backendProcess.kill()
-  }
+  killBackend()
 })

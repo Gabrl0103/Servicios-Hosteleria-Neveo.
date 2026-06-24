@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { SessionProvider } from './context/SessionContext'
 import NavBar from './components/NavBar'
 import IconDefs from './components/IconDefs'
@@ -26,7 +26,7 @@ export default function App() {
   return (
     <SessionProvider>
       <IconDefs />
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/reportes" replace />} />
           <Route path="/mesas" element={<Layout><TablesPage /></Layout>} />
@@ -40,7 +40,7 @@ export default function App() {
           <Route path="/recibo/:cashRegisterId" element={<ShiftReceiptPage />} />
           <Route path="/recibo-venta/:orderId" element={<OrderReceiptPage />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </SessionProvider>
   )
 }

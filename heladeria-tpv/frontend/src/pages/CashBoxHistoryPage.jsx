@@ -40,7 +40,7 @@ export default function CashBoxHistoryPage() {
     // Pestana/ventana aparte, igual al patron de Loggro (cashBox-print).
     // En la app empaquetada con Electron, esto se intercepta para abrir
     // una BrowserWindow nueva en vez de una pestana del navegador.
-    window.open(`/recibo/${cashRegisterId}`, '_blank', 'width=420,height=720')
+    window.open(`#/recibo/${cashRegisterId}`, '_blank', 'width=420,height=720')
   }
 
   return (
