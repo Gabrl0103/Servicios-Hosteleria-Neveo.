@@ -3,6 +3,7 @@ package com.heladeria.tpv.controller;
 import com.heladeria.tpv.dto.AddToTableRequest;
 import com.heladeria.tpv.dto.RestaurantTableRequest;
 import com.heladeria.tpv.dto.UpdateTablePositionRequest;
+import com.heladeria.tpv.model.PendingTableItem;
 import com.heladeria.tpv.model.RestaurantTable;
 import com.heladeria.tpv.service.RestaurantTableService;
 import jakarta.validation.Valid;
@@ -50,8 +51,18 @@ public class RestaurantTableController {
         return tableService.updatePosition(id, request.getPositionX(), request.getPositionY());
     }
 
+    @GetMapping("/{id}/items")
+    public List<PendingTableItem> getPendingItems(@PathVariable Long id) {
+        return tableService.getPendingItems(id);
+    }
+
     @PostMapping("/{id}/items")
     public RestaurantTable addProduct(@PathVariable Long id, @Valid @RequestBody AddToTableRequest request) {
         return tableService.addProduct(id, request.getProductId(), request.getQuantity());
+    }
+
+    @PostMapping("/{id}/items/remove")
+    public RestaurantTable removeProduct(@PathVariable Long id, @Valid @RequestBody AddToTableRequest request) {
+        return tableService.removeProduct(id, request.getProductId(), request.getQuantity());
     }
 }

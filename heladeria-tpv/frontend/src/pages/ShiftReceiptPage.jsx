@@ -148,10 +148,6 @@ export default function ShiftReceiptPage() {
           </div>
 
           <div style={{ textAlign: 'center', marginTop: 16, fontSize: 9.5, color: '#777', lineHeight: 1.7 }}>
-            Documento no valido como
-            <br />
-            factura electronica
-            <br />
             *** GRACIAS ***
           </div>
 

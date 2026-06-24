@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getProducts } from '../api/products'
-import { getTable, addProductToTable } from '../api/tables'
+import { getTable, getTablePendingItems, addProductToTable, removeProductFromTable } from '../api/tables'
 import { createOrder } from '../api/orders'
 import { useSession } from '../context/SessionContext'
 import { formatCurrency } from '../utils/format'
@@ -35,7 +35,18 @@ export default function TableDetailPage() {
       return
     }
     loadTable()
-    getProducts(false).then(setProducts).catch((err) => setError(err.message))
+    getProducts(false).then((prods) => {
+      setProducts(prods)
+      getTablePendingItems(tableId).then((items) => {
+        const restored = items
+          .map((item) => {
+            const product = prods.find((p) => p.id === item.product.id)
+            return product ? { product, quantity: item.quantity, note: '' } : null
+          })
+          .filter(Boolean)
+        setCart(restored)
+      }).catch(() => {})
+    }).catch((err) => setError(err.message))
   }, [cashRegister, navigate, tableId])
 
   const categories = useMemo(() => {
@@ -51,30 +62,54 @@ export default function TableDetailPage() {
     setProductForQuantity(product)
   }
 
-  function addToCartWithQuantity(quantity) {
+  async function addToCartWithQuantity(quantity) {
     const product = productForQuantity
-    setCart((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id)
-      if (existing) {
-        return prev.map((i) =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + quantity } : i
-        )
-      }
-      return [...prev, { product, quantity, note: '' }]
-    })
     setProductForQuantity(null)
+    try {
+      const updated = await addProductToTable(table.id, product.id, quantity)
+      setTable(updated)
+      setCart((prev) => {
+        const existing = prev.find((i) => i.product.id === product.id)
+        if (existing) {
+          return prev.map((i) =>
+            i.product.id === product.id ? { ...i, quantity: i.quantity + quantity } : i
+          )
+        }
+        return [...prev, { product, quantity, note: '' }]
+      })
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  function changeQuantity(productId, delta) {
-    setCart((prev) =>
-      prev
-        .map((i) => (i.product.id === productId ? { ...i, quantity: i.quantity + delta } : i))
-        .filter((i) => i.quantity > 0)
-    )
+  async function changeQuantity(productId, delta) {
+    const item = cart.find((i) => i.product.id === productId)
+    if (!item) return
+    try {
+      const updated = delta > 0
+        ? await addProductToTable(table.id, productId, 1)
+        : await removeProductFromTable(table.id, productId, 1)
+      setTable(updated)
+      setCart((prev) =>
+        prev
+          .map((i) => (i.product.id === productId ? { ...i, quantity: i.quantity + delta } : i))
+          .filter((i) => i.quantity > 0)
+      )
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
-  function removeFromCart(productId) {
-    setCart((prev) => prev.filter((i) => i.product.id !== productId))
+  async function removeFromCart(productId) {
+    const item = cart.find((i) => i.product.id === productId)
+    if (!item) return
+    try {
+      const updated = await removeProductFromTable(table.id, productId, item.quantity)
+      setTable(updated)
+      setCart((prev) => prev.filter((i) => i.product.id !== productId))
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   function updateNote(productId, note) {
@@ -83,19 +118,16 @@ export default function TableDetailPage() {
 
   const subtotal = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0)
 
-  async function handleAddWithoutPaying() {
+  async function clearCart() {
     setError('')
-    setConfirming(true)
     try {
       for (const item of cart) {
-        await addProductToTable(table.id, item.product.id, item.quantity)
+        await removeProductFromTable(table.id, item.product.id, item.quantity)
       }
       setCart([])
       loadTable()
     } catch (err) {
       setError(err.message)
-    } finally {
-      setConfirming(false)
     }
   }
 
@@ -226,7 +258,7 @@ export default function TableDetailPage() {
         <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--ink)' }}>Pedido actual</div>
           {cart.length > 0 && (
-            <button onClick={() => setCart([])} style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-soft-2)', fontSize: 12, fontWeight: 800, padding: '8px 12px', borderRadius: 9 }}>
+            <button onClick={clearCart} style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-soft-2)', fontSize: 12, fontWeight: 800, padding: '8px 12px', borderRadius: 9 }}>
               Vaciar
             </button>
           )}
@@ -266,13 +298,6 @@ export default function TableDetailPage() {
             <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--ink)' }}>Total pedido</span>
             <span className="mono" style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent)' }}>{formatCurrency(subtotal)}</span>
           </div>
-          <button
-            disabled={cart.length === 0 || confirming}
-            onClick={handleAddWithoutPaying}
-            style={{ width: '100%', background: 'var(--tile-bg)', color: 'var(--ink)', fontWeight: 800, padding: 14, borderRadius: 13, fontSize: 15, marginBottom: 9 }}
-          >
-            {confirming ? 'Agregando...' : '+ Agregar sin pagar'}
-          </button>
           <button
             disabled={cart.length === 0}
             onClick={startPayFlow}

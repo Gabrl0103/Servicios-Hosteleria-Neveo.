@@ -5,6 +5,7 @@ import com.heladeria.tpv.exception.BusinessRuleException;
 import com.heladeria.tpv.exception.ResourceNotFoundException;
 import com.heladeria.tpv.model.*;
 import com.heladeria.tpv.repository.OrderRepository;
+import com.heladeria.tpv.repository.PendingTableItemRepository;
 import com.heladeria.tpv.repository.ProductRepository;
 import com.heladeria.tpv.repository.RestaurantTableRepository;
 import com.heladeria.tpv.repository.UserRepository;
@@ -24,17 +25,20 @@ public class OrderService {
     private final UserRepository userRepository;
     private final CashRegisterService cashRegisterService;
     private final RestaurantTableRepository tableRepository;
+    private final PendingTableItemRepository pendingTableItemRepository;
 
     public OrderService(OrderRepository orderRepository,
                          ProductRepository productRepository,
                          UserRepository userRepository,
                          CashRegisterService cashRegisterService,
-                         RestaurantTableRepository tableRepository) {
+                         RestaurantTableRepository tableRepository,
+                         PendingTableItemRepository pendingTableItemRepository) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.cashRegisterService = cashRegisterService;
         this.tableRepository = tableRepository;
+        this.pendingTableItemRepository = pendingTableItemRepository;
     }
 
     @Transactional
@@ -93,11 +97,11 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // Al cobrar, la mesa vuelve a quedar en cero pero sigue existiendo.
         if (saved.getTable() != null) {
             RestaurantTable table = saved.getTable();
             table.setPendingTotal(BigDecimal.ZERO);
             tableRepository.save(table);
+            pendingTableItemRepository.deleteByTableId(table.getId());
         }
 
         return saved;

@@ -2,8 +2,10 @@ package com.heladeria.tpv.service;
 
 import com.heladeria.tpv.dto.RestaurantTableRequest;
 import com.heladeria.tpv.exception.ResourceNotFoundException;
+import com.heladeria.tpv.model.PendingTableItem;
 import com.heladeria.tpv.model.Product;
 import com.heladeria.tpv.model.RestaurantTable;
+import com.heladeria.tpv.repository.PendingTableItemRepository;
 import com.heladeria.tpv.repository.ProductRepository;
 import com.heladeria.tpv.repository.RestaurantTableRepository;
 import org.springframework.stereotype.Service;
@@ -17,10 +19,14 @@ public class RestaurantTableService {
 
     private final RestaurantTableRepository tableRepository;
     private final ProductRepository productRepository;
+    private final PendingTableItemRepository pendingItemRepository;
 
-    public RestaurantTableService(RestaurantTableRepository tableRepository, ProductRepository productRepository) {
+    public RestaurantTableService(RestaurantTableRepository tableRepository,
+                                  ProductRepository productRepository,
+                                  PendingTableItemRepository pendingItemRepository) {
         this.tableRepository = tableRepository;
         this.productRepository = productRepository;
+        this.pendingItemRepository = pendingItemRepository;
     }
 
     public List<RestaurantTable> findAll() {
@@ -53,10 +59,6 @@ public class RestaurantTableService {
         tableRepository.deleteById(id);
     }
 
-    /**
-     * Suma el precio del producto al total pendiente de la mesa.
-     * No se guarda detalle de que producto fue, solo el monto.
-     */
     @Transactional
     public RestaurantTable addProduct(Long tableId, Long productId, int quantity) {
         RestaurantTable table = findById(tableId);
@@ -65,17 +67,54 @@ public class RestaurantTableService {
 
         BigDecimal addition = product.getPrice().multiply(BigDecimal.valueOf(quantity));
         table.setPendingTotal(table.getPendingTotal().add(addition));
+
+        PendingTableItem item = pendingItemRepository.findByTableIdAndProductId(tableId, productId)
+                .orElse(null);
+        if (item != null) {
+            item.setQuantity(item.getQuantity() + quantity);
+        } else {
+            item = new PendingTableItem(table, product, quantity);
+        }
+        pendingItemRepository.save(item);
+
         return tableRepository.save(table);
     }
 
-    /**
-     * Resetea el pendiente a cero, normalmente despues de cobrar.
-     * La mesa sigue existiendo con el mismo nombre.
-     */
+    @Transactional
+    public RestaurantTable removeProduct(Long tableId, Long productId, int quantity) {
+        RestaurantTable table = findById(tableId);
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
+
+        BigDecimal subtraction = product.getPrice().multiply(BigDecimal.valueOf(quantity));
+        BigDecimal newTotal = table.getPendingTotal().subtract(subtraction);
+        table.setPendingTotal(newTotal.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : newTotal);
+
+        PendingTableItem item = pendingItemRepository.findByTableIdAndProductId(tableId, productId)
+                .orElse(null);
+        if (item != null) {
+            int remaining = item.getQuantity() - quantity;
+            if (remaining <= 0) {
+                pendingItemRepository.delete(item);
+            } else {
+                item.setQuantity(remaining);
+                pendingItemRepository.save(item);
+            }
+        }
+
+        return tableRepository.save(table);
+    }
+
+    public List<PendingTableItem> getPendingItems(Long tableId) {
+        findById(tableId);
+        return pendingItemRepository.findByTableId(tableId);
+    }
+
     @Transactional
     public RestaurantTable resetPending(Long tableId) {
         RestaurantTable table = findById(tableId);
         table.setPendingTotal(BigDecimal.ZERO);
+        pendingItemRepository.deleteByTableId(tableId);
         return tableRepository.save(table);
     }
 

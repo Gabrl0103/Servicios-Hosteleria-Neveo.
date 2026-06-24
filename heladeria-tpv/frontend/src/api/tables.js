@@ -29,7 +29,17 @@ export async function updateTablePosition(id, positionX, positionY) {
   return data
 }
 
+export async function getTablePendingItems(tableId) {
+  const { data } = await client.get(`/tables/${tableId}/items`)
+  return data
+}
+
 export async function addProductToTable(tableId, productId, quantity) {
   const { data } = await client.post(`/tables/${tableId}/items`, { productId, quantity })
+  return data
+}
+
+export async function removeProductFromTable(tableId, productId, quantity) {
+  const { data } = await client.post(`/tables/${tableId}/items/remove`, { productId, quantity })
   return data
 }

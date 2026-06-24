@@ -311,9 +311,10 @@ export default function ReportsPage() {
         )}
 
         {error && <p style={{ color: 'var(--red-text)' }}>{error}</p>}
-        {loading && <p style={{ color: 'var(--text-soft)' }}>Cargando...</p>}
+        {loading && !report && <p style={{ color: 'var(--text-soft)' }}>Cargando...</p>}
 
-        {report && !loading && (
+        {report && (
+          <div style={{ position: 'relative', opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s', pointerEvents: loading ? 'none' : 'auto' }}>
           <>
             {/* KPIs */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -494,6 +495,7 @@ export default function ReportsPage() {
               </div>
             </div>
           </>
+          </div>
         )}
       </div>
     </div>
