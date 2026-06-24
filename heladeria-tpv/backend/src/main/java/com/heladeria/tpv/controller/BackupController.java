@@ -10,7 +10,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.sql.DataSource;
 import java.io.File;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.LocalDate;
 
 @RestController
@@ -20,12 +23,25 @@ public class BackupController {
     @Value("${APP_DATA_DIR:.}")
     private String appDataDir;
 
+    private final DataSource dataSource;
+
+    public BackupController(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
     @GetMapping("/database")
     public ResponseEntity<Resource> downloadDatabase() {
         File dbFile = new File(appDataDir, "heladeria.db");
 
         if (!dbFile.exists()) {
             return ResponseEntity.notFound().build();
+        }
+
+        // Flush WAL to main db file so the backup is complete
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+        } catch (Exception ignored) {
         }
 
         String filename = "heladeria-backup-" + LocalDate.now() + ".db";
