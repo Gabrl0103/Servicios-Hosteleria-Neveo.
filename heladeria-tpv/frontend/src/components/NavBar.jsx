@@ -53,7 +53,7 @@ export default function NavBar() {
           )}
         </div>
         <div style={{ lineHeight: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.01em' }}>Heladeria</div>
+          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.01em' }}>Neveo</div>
           <div className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '.18em', marginTop: 3 }}>
             PUNTO DE VENTA
           </div>
