@@ -23,6 +23,8 @@ public class OrderResponse {
     private BigDecimal amountReceived;
     private BigDecimal changeGiven;
     private OrderStatus status;
+    private String motivoAnulacion;
+    private Long cashRegisterId;
     private List<ItemResponse> items;
 
     public OrderResponse(Order order) {
@@ -39,6 +41,8 @@ public class OrderResponse {
         this.amountReceived = order.getAmountReceived();
         this.changeGiven = order.getChangeGiven();
         this.status = order.getStatus();
+        this.motivoAnulacion = order.getMotivoAnulacion();
+        this.cashRegisterId = order.getCashRegister().getId();
         this.items = order.getItems().stream().map(ItemResponse::new).collect(Collectors.toList());
     }
 
@@ -84,6 +88,14 @@ public class OrderResponse {
 
     public OrderStatus getStatus() {
         return status;
+    }
+
+    public String getMotivoAnulacion() {
+        return motivoAnulacion;
+    }
+
+    public Long getCashRegisterId() {
+        return cashRegisterId;
     }
 
     public List<ItemResponse> getItems() {

@@ -56,6 +56,9 @@ public class Order {
     @Column
     private LocalDateTime voidedAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String motivoAnulacion;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -164,6 +167,14 @@ public class Order {
 
     public void setVoidedAt(LocalDateTime voidedAt) {
         this.voidedAt = voidedAt;
+    }
+
+    public String getMotivoAnulacion() {
+        return motivoAnulacion;
+    }
+
+    public void setMotivoAnulacion(String motivoAnulacion) {
+        this.motivoAnulacion = motivoAnulacion;
     }
 
     public List<OrderItem> getItems() {

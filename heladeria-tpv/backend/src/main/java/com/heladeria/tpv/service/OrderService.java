@@ -12,6 +12,9 @@ import com.heladeria.tpv.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -133,5 +136,32 @@ public class OrderService {
     public Order findById(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado"));
+    }
+
+    public Page<Order> findByDateRange(java.time.LocalDate from, java.time.LocalDate to, int page, int size) {
+        return orderRepository.findAllBetweenPaged(
+                from.atStartOfDay(),
+                to.plusDays(1).atStartOfDay(),
+                PageRequest.of(page, size));
+    }
+
+    @Transactional
+    public Order anularOrder(Long orderId, String motivo) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new com.heladeria.tpv.exception.BusinessRuleException("El motivo de anulación es obligatorio");
+        }
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new com.heladeria.tpv.exception.ResourceNotFoundException("Pedido no encontrado"));
+        if (order.getStatus() == OrderStatus.ANULADO) {
+            throw new com.heladeria.tpv.exception.BusinessRuleException("Este pedido ya está anulado");
+        }
+        CashRegister openRegister = cashRegisterService.getOpenRegisterOrThrow();
+        if (!order.getCashRegister().getId().equals(openRegister.getId())) {
+            throw new com.heladeria.tpv.exception.BusinessRuleException("Solo se pueden anular ventas del turno actualmente abierto");
+        }
+        order.setStatus(OrderStatus.ANULADO);
+        order.setMotivoAnulacion(motivo.trim());
+        order.setVoidedAt(LocalDateTime.now());
+        return orderRepository.save(order);
     }
 }

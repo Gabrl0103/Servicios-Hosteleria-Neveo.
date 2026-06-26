@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getReportSummary, getDashboardKpis, getMonthlyBarChart } from '../api/reports'
+import { getOrders, anularOrder } from '../api/orders'
+import { useSession } from '../context/SessionContext'
 import { formatCurrency } from '../utils/format'
 import { categoryInfo } from '../utils/categoryColors'
 
@@ -133,6 +135,25 @@ export default function ReportsPage() {
   const [barChart, setBarChart] = useState(null)
   const [barHover, setBarHover] = useState(null)
   const [lineHover, setLineHover] = useState(null)
+  const [currentFrom, setCurrentFrom] = useState(null)
+  const [currentTo, setCurrentTo] = useState(null)
+
+  // Orders section state
+  const [ordersVisible, setOrdersVisible] = useState(false)
+  const [orders, setOrders] = useState(null)
+  const [ordersPage, setOrdersPage] = useState(0)
+  const [ordersHasMore, setOrdersHasMore] = useState(false)
+  const [ordersTotal, setOrdersTotal] = useState(0)
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const ordersCacheKey = useRef(null)
+
+  // Anular modal state
+  const [anularTarget, setAnularTarget] = useState(null)
+  const [anularMotivo, setAnularMotivo] = useState('')
+  const [anularLoading, setAnularLoading] = useState(false)
+  const [anularError, setAnularError] = useState('')
+
+  const { cashRegister } = useSession()
 
   useEffect(() => {
     getDashboardKpis().then(setKpis).catch(() => setKpis(null))
@@ -142,6 +163,15 @@ export default function ReportsPage() {
   async function loadReport(from, to) {
     setLoading(true)
     setError('')
+    setCurrentFrom(from)
+    setCurrentTo(to)
+    // Invalidate orders cache when range changes
+    if (ordersCacheKey.current !== `${from}_${to}`) {
+      setOrders(null)
+      setOrdersPage(0)
+      setOrdersHasMore(false)
+      ordersCacheKey.current = null
+    }
     try {
       const data = await getReportSummary(from, to)
       setReport(data)
@@ -152,8 +182,67 @@ export default function ReportsPage() {
     }
   }
 
+  async function loadOrdersPage(from, to, page) {
+    setOrdersLoading(true)
+    try {
+      const data = await getOrders(from, to, page, 20)
+      if (page === 0) {
+        setOrders(data.content)
+        ordersCacheKey.current = `${from}_${to}`
+      } else {
+        setOrders((prev) => [...prev, ...data.content])
+      }
+      setOrdersPage(data.number)
+      setOrdersHasMore(!data.last)
+      setOrdersTotal(data.totalElements)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOrdersLoading(false)
+    }
+  }
+
+  function handleToggleOrders() {
+    if (!ordersVisible) {
+      setOrdersVisible(true)
+      const cacheKey = `${currentFrom}_${currentTo}`
+      if (ordersCacheKey.current !== cacheKey) {
+        loadOrdersPage(currentFrom, currentTo, 0)
+      }
+    } else {
+      setOrdersVisible(false)
+    }
+  }
+
+  async function handleAnular() {
+    if (!anularMotivo.trim() || !anularTarget) return
+    setAnularLoading(true)
+    setAnularError('')
+    try {
+      await anularOrder(anularTarget.id, anularMotivo.trim())
+      // Refresh orders list and report
+      ordersCacheKey.current = null
+      setOrders(null)
+      await Promise.all([
+        loadOrdersPage(currentFrom, currentTo, 0),
+        (async () => {
+          const data = await getReportSummary(currentFrom, currentTo)
+          setReport(data)
+        })(),
+      ])
+      setAnularTarget(null)
+      setAnularMotivo('')
+    } catch (err) {
+      setAnularError(err.message)
+    } finally {
+      setAnularLoading(false)
+    }
+  }
+
   useEffect(() => {
     const { from, to } = getRange('week')
+    setCurrentFrom(from)
+    setCurrentTo(to)
     loadReport(from, to)
   }, [])
 
@@ -179,6 +268,7 @@ export default function ReportsPage() {
   const barGeometry = barChart ? buildBarGeometry(barChart) : null
 
   return (
+    <>
     <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', padding: 32 }}>
       <div style={{ maxWidth: 1080, margin: '0 auto' }}>
         <h1 style={{ fontSize: 25, fontWeight: 900, margin: '0 0 4px' }}>Reportes</h1>
@@ -497,10 +587,187 @@ export default function ReportsPage() {
           </>
           </div>
         )}
+
+        {/* Ventas del periodo — colapsada por defecto, carga perezosa */}
+        <div className="card" style={{ marginTop: 16, overflow: 'hidden' }}>
+          <button
+            onClick={handleToggleOrders}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '16px 22px', background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: 900, color: 'var(--ink)',
+            }}
+          >
+            <span>
+              Ventas del periodo
+              {ordersTotal > 0
+                ? <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginLeft: 8 }}>({ordersTotal})</span>
+                : report && <span style={{ fontWeight: 700, color: 'var(--text-soft)', marginLeft: 8 }}>({report.totalOrders})</span>
+              }
+            </span>
+            <svg width="18" height="18" style={{ color: 'var(--text-faint)', transform: ordersVisible ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+              <use href="#ic-down" />
+            </svg>
+          </button>
+
+          {ordersVisible && (
+            <div style={{ borderTop: '1px solid var(--border-soft)', padding: '0 22px 18px' }}>
+              {ordersLoading && !orders && (
+                <p style={{ fontSize: 13, color: 'var(--text-soft)', fontWeight: 700, padding: '14px 0' }}>Cargando...</p>
+              )}
+              {orders && (
+                <>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          <th style={thStyle}>#</th>
+                          <th style={thStyle}>Fecha</th>
+                          <th style={thStyle}>Mesa</th>
+                          <th style={thStyle}>Cajero</th>
+                          <th style={thStyle}>Método</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
+                          <th style={thStyle}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.map((order) => {
+                          const voided = order.status === 'ANULADO'
+                          const canAnular = !voided && cashRegister && order.cashRegisterId === cashRegister.id
+                          return (
+                            <tr
+                              key={order.id}
+                              style={{
+                                borderBottom: '1px solid var(--border-soft-2)',
+                                opacity: voided ? 0.5 : 1,
+                              }}
+                            >
+                              <td style={tdStyle} className="mono">
+                                {order.id}
+                                {voided && (
+                                  <span style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--red-text)', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+                                    Anulada
+                                  </span>
+                                )}
+                              </td>
+                              <td style={tdStyle} className="mono">
+                                {new Date(order.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}{' '}
+                                {new Date(order.createdAt).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })}
+                              </td>
+                              <td style={{ ...tdStyle, textDecoration: voided ? 'line-through' : 'none' }}>{order.tableName || '—'}</td>
+                              <td style={{ ...tdStyle, textDecoration: voided ? 'line-through' : 'none' }}>{order.userName}</td>
+                              <td style={tdStyle}>
+                                <span style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 700 }}>
+                                  {order.paymentMethod}
+                                </span>
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, textDecoration: voided ? 'line-through' : 'none' }} className="mono">
+                                {formatCurrency(order.total)}
+                              </td>
+                              <td style={{ ...tdStyle, display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
+                                <button
+                                  title="Reimprimir recibo"
+                                  onClick={() => window.open(`#/recibo-venta/${order.id}`, '_blank', 'width=420,height=720')}
+                                  style={iconBtnStyle}
+                                >
+                                  <svg width="14" height="14"><use href="#ic-print" /></svg>
+                                </button>
+                                {canAnular && (
+                                  <button
+                                    title="Anular venta"
+                                    onClick={() => { setAnularTarget(order); setAnularMotivo(''); setAnularError('') }}
+                                    style={{ ...iconBtnStyle, color: 'var(--red-text)' }}
+                                  >
+                                    <svg width="14" height="14"><use href="#ic-x" /></svg>
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {ordersHasMore && (
+                    <button
+                      onClick={() => loadOrdersPage(currentFrom, currentTo, ordersPage + 1)}
+                      disabled={ordersLoading}
+                      style={{
+                        marginTop: 12, background: 'var(--tile-bg)', border: 'none', padding: '8px 18px',
+                        borderRadius: 9, fontSize: 12, fontWeight: 800, color: 'var(--ink)', cursor: 'pointer',
+                      }}
+                    >
+                      {ordersLoading ? 'Cargando...' : 'Ver más'}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
+
+    {/* Modal de anulación */}
+    {anularTarget && (
+      <div style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}>
+        <div style={{ background: '#fff', borderRadius: 18, padding: '28px 32px', width: 420, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
+          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--ink)', marginBottom: 6 }}>
+            Anular venta #{anularTarget.id}
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-soft)', fontWeight: 700, margin: '0 0 18px' }}>
+            {formatCurrency(anularTarget.total)} · {anularTarget.tableName || 'Sin mesa'} · {anularTarget.paymentMethod}
+          </p>
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: 10, marginBottom: 18, fontSize: 13, fontWeight: 700, color: '#991b1b' }}>
+            Esta venta no se borrará — quedará marcada como anulada para auditoría. Esta acción no se puede deshacer.
+          </div>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6 }}>
+            Motivo de anulación *
+          </label>
+          <textarea
+            value={anularMotivo}
+            onChange={(e) => setAnularMotivo(e.target.value)}
+            placeholder="Ej: Se cobró por error, cliente no recibió el producto..."
+            rows={3}
+            style={{
+              width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10,
+              fontSize: 13, fontWeight: 700, color: 'var(--ink)', resize: 'vertical', boxSizing: 'border-box',
+            }}
+          />
+          {anularError && <p style={{ color: 'var(--red-text)', fontSize: 13, marginTop: 8 }}>{anularError}</p>}
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            <button
+              onClick={() => setAnularTarget(null)}
+              style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1px solid var(--border)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleAnular}
+              disabled={!anularMotivo.trim() || anularLoading}
+              style={{
+                flex: 1, padding: '11px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 800,
+                cursor: anularMotivo.trim() && !anularLoading ? 'pointer' : 'not-allowed',
+                background: anularMotivo.trim() && !anularLoading ? '#dc2626' : 'var(--border)',
+                color: anularMotivo.trim() && !anularLoading ? '#fff' : 'var(--text-faint)',
+              }}
+            >
+              {anularLoading ? 'Anulando...' : 'Confirmar anulación'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
+
+const thStyle = { padding: '6px 8px', textAlign: 'left', fontWeight: 800, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.04em', fontSize: 10 }
+const tdStyle = { padding: '7px 8px', color: 'var(--ink)', fontSize: 12 }
+const iconBtnStyle = { background: 'var(--tile-bg)', border: 'none', width: 28, height: 28, borderRadius: 7, display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--ink)' }
 
 function KpiCard({ label, value, accent }) {
   return (

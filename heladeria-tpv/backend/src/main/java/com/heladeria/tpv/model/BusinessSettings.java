@@ -18,7 +18,9 @@ public class BusinessSettings {
 
     private String phone;
 
-    @Column(columnDefinition = "TEXT")
+    private String logoPath;
+
+    @Transient
     private String logoBase64;
 
     private String businessHours;
@@ -78,6 +80,14 @@ public class BusinessSettings {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getLogoPath() {
+        return logoPath;
+    }
+
+    public void setLogoPath(String logoPath) {
+        this.logoPath = logoPath;
     }
 
     public String getLogoBase64() {

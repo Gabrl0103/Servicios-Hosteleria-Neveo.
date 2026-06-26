@@ -16,3 +16,13 @@ export async function voidOrder(id, voidedByUserId) {
   })
   return data
 }
+
+export async function getOrders(from, to, page = 0, size = 20) {
+  const { data } = await client.get('/orders', { params: { from, to, page, size } })
+  return data
+}
+
+export async function anularOrder(id, motivo) {
+  const { data } = await client.post(`/orders/${id}/anular`, null, { params: { motivo } })
+  return data
+}

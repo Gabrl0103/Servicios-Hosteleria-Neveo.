@@ -3,6 +3,8 @@ package com.heladeria.tpv.repository;
 import com.heladeria.tpv.model.Order;
 import com.heladeria.tpv.model.OrderStatus;
 import com.heladeria.tpv.model.PaymentMethod;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -53,6 +55,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findConfirmedBetween(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to);
+
+    @Query("""
+        select o
+        from Order o
+        where o.createdAt >= :from
+          and o.createdAt < :to
+        order by o.createdAt desc
+        """)
+    Page<Order> findAllBetweenPaged(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            Pageable pageable);
 
     interface PaymentMethodTotalsProjection {
         PaymentMethod getPaymentMethod();

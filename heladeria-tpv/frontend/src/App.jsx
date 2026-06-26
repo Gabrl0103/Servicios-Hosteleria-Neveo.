@@ -11,6 +11,7 @@ import ProductsPage from './pages/ProductsPage'
 import SettingsPage from './pages/SettingsPage'
 import ShiftReceiptPage from './pages/ShiftReceiptPage'
 import OrderReceiptPage from './pages/OrderReceiptPage'
+import DatabaseRestorePage from './pages/DatabaseRestorePage'
 import './styles/global.css'
 
 function Layout({ children }) {
@@ -39,6 +40,7 @@ export default function App() {
           {/* Ruta independiente, sin NavBar, pensada para abrirse en pestana/ventana aparte */}
           <Route path="/recibo/:cashRegisterId" element={<ShiftReceiptPage />} />
           <Route path="/recibo-venta/:orderId" element={<OrderReceiptPage />} />
+          <Route path="/soporte/restaurar" element={<DatabaseRestorePage />} />
         </Routes>
       </HashRouter>
     </SessionProvider>

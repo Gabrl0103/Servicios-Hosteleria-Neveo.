@@ -5,7 +5,11 @@ import com.heladeria.tpv.dto.OrderResponse;
 import com.heladeria.tpv.model.Order;
 import com.heladeria.tpv.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -32,5 +36,20 @@ public class OrderController {
     public OrderResponse voidOrder(@PathVariable Long id, @RequestParam Long voidedByUserId) {
         Order order = orderService.voidOrder(id, voidedByUserId);
         return new OrderResponse(order);
+    }
+
+    @GetMapping
+    public Page<OrderResponse> findByDateRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return orderService.findByDateRange(from, to, page, size)
+                .map(OrderResponse::new);
+    }
+
+    @PostMapping("/{id}/anular")
+    public OrderResponse anularOrder(@PathVariable Long id, @RequestParam String motivo) {
+        return new OrderResponse(orderService.anularOrder(id, motivo));
     }
 }
