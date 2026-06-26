@@ -145,10 +145,7 @@ export default function TableDetailPage() {
         items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity, note: i.note || null })),
         ...paymentData,
       })
-      const receiptWindow = window.open(`#/recibo-venta/${order.id}`, '_blank', 'width=420,height=720')
-      if (!receiptWindow) {
-        setError(`Venta guardada (ID ${order.id}). La ventana de recibo no se pudo abrir — reimprime desde Reportes.`)
-      }
+      window.open(`#/recibo-venta/${order.id}`, '_blank', 'width=420,height=720')
       setCart([])
       setShowPayment(false)
       loadTable()

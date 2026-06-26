@@ -229,6 +229,8 @@ export default function ReportsPage() {
           const data = await getReportSummary(currentFrom, currentTo)
           setReport(data)
         })(),
+        getDashboardKpis().then(setKpis).catch(() => {}),
+        getMonthlyBarChart().then(setBarChart).catch(() => {}),
       ])
       setAnularTarget(null)
       setAnularMotivo('')
